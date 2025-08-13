@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strongman NextGen</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/main.css">
+    <meta name="theme-color" content="#2c3e50">
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzJjM2U1MCIgd2lkdGg9IjE1MHB4IiBoZWlnaHQ9IjE1MHB4Ij48cGF0aCBkPSJNMjIgMTJoLTJ2LTJoLTJ2LTJoLTJ2Mkg4di0ySDZ2MkgydjJoMlYxNGgydjJoMnYyaDJ2LTJoMnYtMmgydjJoMnYtMmgydi0yaC0yem0tMTAgNmMtMS4xIDAtMi0uOS0yLTJzLjktMiAyLTIgMiAuOSAyIDJzLS45IDItMiAyetTTE2IDhjMCAxLjEtLjkgMi0yIDJoLTRjLTEuMSAwLTItLjktMi0yVjZoMHYyYzAgLjU1LjQ1IDEgMSAxczEtLjQ1IDEtMVY2aDJ2MmMwIC41NS40NSAxIDEgMXMxLS40NSAxLTFWNmgwdjJ6Ii8+PC9zdmc+">
+</head>
+<body class="light">
+    <!-- Notification Bar -->
+    <div id="notification-bar" class="notification-bar"></div>
+
+    <!-- Save Indicator -->
+    <div id="saveIndicator" class="save-indicator">💾 Zapisano</div>
+
+    <!-- NAVIGATION TABS -->
+    <nav id="tabNav" class="tab-nav">
+        <button class="tab-btn active" data-tab="title" title="Strona tytułowa">
+            <span class="tab-icon">🏠</span>
+            <span class="tab-label">Tytuł</span>
+        </button>
+        <button class="tab-btn" data-tab="select" title="Kto i Co">
+            <span class="tab-icon">👥</span>
+            <span class="tab-label">Kto i Co</span>
+        </button>
+        <button class="tab-btn" data-tab="competition" title="Zawody">
+            <span class="tab-icon">🎯</span>
+            <span class="tab-label">Zawody</span>
+        </button>
+        <button class="tab-btn" data-tab="results" title="Wyniki">
+            <span class="tab-icon">📊</span>
+            <span class="tab-label">Wyniki</span>
+        </button>
+        <button class="tab-btn" data-tab="summary" title="Podsumowanie">
+            <span class="tab-icon">🏆</span>
+            <span class="tab-label">Podsumowanie</span>
+        </button>
+    </nav>
+
+    <!-- MAIN CONTENT AREA -->
+    <main id="mainContentArea" class="main-content-area">
+        
+        <!-- PANEL 1: STRONA TYTUŁOWA -->
+        <section id="tab-title" class="tab-panel visible">
+            <div class="panel-container">
+                <h1 class="panel-title">Informacje o zawodach</h1>
+                
+                <div class="title-content">
+                    <div class="logo-section">
+                        <img id="logoImg" class="event-logo" alt="Logo zawodów">
+                        <button id="selectLogoBtn" class="file-btn">📷 Wybierz Logo</button>
+                        <input type="file" id="logoUpload" accept="image/*" style="display: none;">
+                    </div>
+                    
+                    <div class="meta-section">
+                        <div class="form-group">
+                            <label for="eventNameInput">Nazwa zawodów</label>
+                            <input type="text" id="eventNameInput" class="form-input" placeholder="Wprowadź nazwę zawodów...">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="eventLocationInput">Miejsce</label>
+                            <input type="text" id="eventLocationInput" class="form-input" placeholder="Wprowadź miejsce...">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="eventDateInput">Data</label>
+                            <input type="date" id="eventDateInput" class="form-input">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="version-info">
+                    <p>Strong Man NextGen - wersja offline</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- PANEL 2: KTO I CO -->
+        <section id="tab-select" class="tab-panel">
+            <div class="panel-container">
+                <h1 class="panel-title">Wybór zawodników i konkurencji</h1>
+                
+                <div class="select-layout">
+                    <!-- Sekcja zawodników -->
+                    <div class="select-section">
+                        <h2>Zawodnicy</h2>
+                        
+                        <div id="categoryFilters" class="category-filters">
+                            <button class="filter-btn active" data-filter="all">Wszyscy</button>
+                        </div>
+                        
+                        <div id="competitorSelectionList" class="competitor-selection-list">
+                            Ładowanie zawodników z bazy danych...
+                        </div>
+                        
+                        <div id="selectionCounter" class="selection-counter">Wybrano: 0</div>
+                        
+                        <div class="database-actions">
+                            <button id="manageDbBtn" class="db-btn">🛠️ Zarządzaj zawodnikami</button>
+                            <button id="exportDbBtn" class="db-btn">📤 Eksport JSON</button>
+                            <button id="importDbTrigger" class="db-btn">📥 Import JSON</button>
+                            <input type="file" id="importDbFile" accept=".json" style="display: none;">
+                        </div>
+                    </div>
+                    
+                    <!-- Sekcja konkurencji -->
+                    <div class="select-section">
+                        <h2>Konkurencje</h2>
+                        
+                        <div id="eventListContainer" class="event-list-container">
+                            Ładowanie konkurencji z bazy danych...
+                        </div>
+                        
+                        <div class="database-actions">
+                            <button id="manageEventsDbBtn" class="db-btn">🛠️ Zarządzaj konkurencjami</button>
+                            <button id="exportEventsDbBtn" class="db-btn">📤 Eksport JSON</button>
+                            <button id="importEventsDbTrigger" class="db-btn">📥 Import JSON</button>
+                            <input type="file" id="importEventsDbFile" accept=".json" style="display: none;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PANEL 3: ZAWODY -->
+        <section id="tab-competition" class="tab-panel">
+            <div class="panel-container">
+                <h1 class="panel-title">Przygotowanie do zawodów</h1>
+                
+                <div class="competition-content">
+                    <div class="start-list-section">
+                        <h2>Lista startowa</h2>
+                        <div id="startList" class="start-list">
+                            <p class="empty-state">Brak wybranych zawodników</p>
+                        </div>
+                    </div>
+                    
+                    <div class="competition-actions">
+                        <button id="shuffleBtn" class="action-btn shuffle-btn">
+                            🎲 Losowanie do I-szej konkurencji
+                        </button>
+                        
+                        <button id="startCompetitionBtn" class="primary-btn start-btn" disabled>
+                            🚀 Rozpocznij zawody
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PANEL 4: WYNIKI -->
+        <section id="tab-results" class="tab-panel">
+            <div class="panel-container">
+                <div class="results-header">
+                    <div class="event-info">
+                        <h1 id="eventTitle" contenteditable="true">Konkurencja 1</h1>
+                        <div class="event-type-controls">
+                            <button id="highTypeBtn" class="type-btn active">🔼 Więcej = Lepiej</button>
+                            <button id="lowTypeBtn" class="type-btn">🔽 Mniej = Lepiej</button>
+                        </div>
+                    </div>
+                    
+                    <div class="results-controls">
+                        <button id="calculatePointsBtn" class="primary-btn">🧮 Oblicz punkty</button>
+                        <button id="nextEventBtn" class="action-btn">➡️ Następna konkurencja</button>
+                        <button id="finalEventBtn" class="warning-btn">🏁 Finał</button>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <div class="table-wrapper">
+                        <table id="resultsTable" class="results-table">
+                            <thead>
+                                <tr>
+                                    <th>Nr</th>
+                                    <th>Zawodnik</th>
+                                    <th>Wynik</th>
+                                    <th>Miejsce</th>
+                                    <th>Punkty</th>
+                                    <th>Suma</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="results-footer">
+                    <div class="secondary-controls">
+                        <button id="showResultsBtn" class="secondary-btn">📊 Historia wyników</button>
+                        <button id="selectEventFromDbBtn" class="secondary-btn">🏋️ Zmień konkurencję</button>
+                        <button id="toggleTableWidthBtn" class="secondary-btn">↔️ Rozwiń tabelę</button>
+                    </div>
+                    
+                    <div class="undo-redo-controls">
+                        <button id="undoBtn" class="undo-redo-btn" disabled>↶ Cofnij</button>
+                        <button id="redoBtn" class="undo-redo-btn" disabled>↷ Ponów</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PANEL 5: PODSUMOWANIE -->
+        <section id="tab-summary" class="tab-panel">
+            <div class="panel-container">
+                <h1 class="panel-title">Klasyfikacja końcowa i eksport</h1>
+                
+                <div id="finalSummaryPanel" class="final-summary-panel">
+                    <p class="empty-state">Brak wyników do wyświetlenia. Przeprowadź zawody, aby zobaczyć klasyfikację końcową.</p>
+                </div>
+                
+                <div class="summary-actions">
+                    <button id="exportHtmlBtn" class="primary-btn">📄 Eksport HTML</button>
+                    <button id="saveCheckpointBtn" class="action-btn">💾 Zapisz punkt kontrolny</button>
+                    <button id="showCheckpointsBtn" class="action-btn">📋 Pokaż punkty kontrolne</button>
+                </div>
+                
+                <div class="export-section">
+                    <button id="exportStateBtn_main" class="export-btn">💾 Eksport stanu</button>
+                    <button id="importStateBtn_main" class="import-btn">📂 Import stanu</button>
+                    <input type="file" id="importFile_main" accept=".json" style="display: none;">
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- MODALS -->
+    
+    <!-- Competitor Database Panel -->
+    <div id="competitorDbPanel" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Zarządzanie bazą zawodników</h3>
+                <button id="closeDbPanelBtn" class="close-btn">✕</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="db-actions">
+                    <button id="exportDbBtn" class="export-btn">📤 Eksport do JSON</button>
+                    <button id="importDbTrigger" class="import-btn">📥 Import z JSON</button>
+                    <input type="file" id="importDbFile" accept=".json" style="display: none;">
+                </div>
+
+                <form id="competitorForm" class="competitor-form">
+                    <input type="hidden" id="competitorId">
+                    
+                    <div class="form-row">
+                        <input type="text" id="competitorNameInput" placeholder="Imię i nazwisko*" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <input type="date" id="birthDateInput" placeholder="Data urodzenia">
+                        <input type="text" id="residenceInput" placeholder="Miejsce zamieszkania">
+                    </div>
+                    
+                    <div class="form-row">
+                        <input type="number" id="heightInput" placeholder="Wzrost (cm)" min="100" max="250">
+                        <input type="number" id="weightInput" placeholder="Waga (kg)" min="40" max="300">
+                    </div>
+                    
+                    <div class="form-row">
+                        <input type="text" id="competitorCategories" placeholder="Kategorie (oddzielone przecinkami)">
+                    </div>
+                    
+                    <div class="form-row">
+                        <textarea id="competitorNotesInput" placeholder="Dodatkowe informacje..."></textarea>
+                    </div>
+                    
+                    <button type="submit" id="competitorFormBtn" class="submit-btn">💾 Zapisz zawodnika</button>
+                </form>
+
+                <div id="competitorListContainer" class="competitor-list-container">
+                    <!-- Content populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Database Panel -->
+    <div id="eventDbPanel" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Zarządzanie konkurencjami</h3>
+                <button id="closeEventDbPanelBtn" class="close-btn">✕</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="db-actions">
+                    <button id="exportEventsDbBtn" class="export-btn">📤 Eksport do JSON</button>
+                    <button id="importEventsDbTrigger" class="import-btn">📥 Import z JSON</button>
+                    <input type="file" id="importEventsDbFile" accept=".json" style="display: none;">
+                </div>
+
+                <form id="eventForm" class="event-form">
+                    <input type="hidden" id="eventId">
+                    
+                    <div class="form-row">
+                        <input type="text" id="eventNameDbInput" placeholder="Nazwa konkurencji*" required>
+                        <select id="eventTypeDbInput" required>
+                            <option value="">Wybierz typ</option>
+                            <option value="high">🔼 Więcej = Lepiej</option>
+                            <option value="low">🔽 Mniej = Lepiej</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" id="eventFormBtn" class="submit-btn">💾 Zapisz konkurencję</button>
+                </form>
+
+                <div id="eventListContainer" class="event-list-container">
+                    <!-- Content populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Select Event Modal -->
+    <div id="selectEventModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Wybierz konkurencję</h3>
+                <button id="selectEventCancelBtn" class="close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="selectEventList" class="select-event-list">
+                    <!-- Content populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Competitor Detail Modal -->
+    <div id="competitorDetailModal" class="modal-overlay">
+        <div class="modal-content competitor-detail">
+            <div class="modal-header">
+                <h3 id="competitorDetailName">Szczegóły zawodnika</h3>
+                <button id="competitorDetailCloseBtn" class="close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="competitor-detail-content">
+                    <img id="competitorDetailPhoto" class="competitor-photo" alt="Zdjęcie zawodnika">
+                    <div id="competitorDetailMeta" class="competitor-meta"></div>
+                    <div id="competitorDetailNotes" class="competitor-notes"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmationModal" class="modal-overlay">
+        <div class="modal-content confirmation">
+            <div class="modal-header">
+                <h3>Potwierdzenie</h3>
+            </div>
+            <div class="modal-body">
+                <p id="modalText">Czy na pewno?</p>
+                <div class="modal-actions">
+                    <button id="confirmBtn" class="confirm-btn">Tak</button>
+                    <button id="cancelBtn" class="cancel-btn">Nie</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prompt Modal -->
+    <div id="promptModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Wprowadź wartość</h3>
+            </div>
+            <div class="modal-body">
+                <p id="promptText">Wprowadź wartość:</p>
+                <input type="text" id="promptInput" class="prompt-input">
+                <div class="modal-actions">
+                    <button id="promptConfirmBtn" class="confirm-btn">OK</button>
+                    <button id="promptCancelBtn" class="cancel-btn">Anuluj</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Focus Mode Modal -->
+    <div id="focusModeModal" class="focus-mode-modal">
+        <div class="focus-mode-content">
+            <div class="focus-competitor-info">
+                <img id="focusCompetitorPhoto" class="focus-competitor-photo" alt="Zawodnik">
+                <h3 id="focusCompetitorName">Zawodnik</h3>
+            </div>
+            
+            <div class="focus-input-section">
+                <input type="text" id="focusResultInput" class="focus-result-input" placeholder="Wprowadź wynik...">
+            </div>
+            
+            <div class="focus-controls">
+                <button id="focusPrevBtn" class="focus-nav-btn">⬅️ Poprzedni</button>
+                <button id="focusConfirmNextBtn" class="focus-confirm-btn">Zatwierdź i następny</button>
+                <button id="focusNextBtn" class="focus-nav-btn">Następny ➡️</button>
+            </div>
+            
+            <button id="closeFocusBtn" class="focus-close-btn">✕ Zamknij</button>
+        </div>
+    </div>
+
+    <!-- Fullscreen Stopwatch -->
+    <div id="fullscreenStopwatch" class="fullscreen-stopwatch">
+        <div class="fs-competitor-info">
+            <img id="fsCompetitorPhoto" class="fs-competitor-photo" alt="Zawodnik">
+            <h2 id="fsCompetitorName">Zawodnik</h2>
+        </div>
+        
+        <div id="fsModeSelection" class="fs-mode-selection">
+            <button id="fsRepsBtn" class="fs-mode-btn">🔢 Powtórzenia</button>
+            <button id="fsLapsBtn" class="fs-mode-btn">⏱️ Międzyczasy</button>
+        </div>
+        
+        <div id="fsDisplayArea" class="fs-display-area">
+            <div id="fsTime" class="fs-time">00:00.00</div>
+            <button id="fsStartStopBtn" class="fs-start-stop-btn">Start</button>
+        </div>
+        
+        <div id="fsPostStopControls" class="fs-post-stop-controls">
+            <button id="fsResetBtn" class="fs-control-btn">🔄 Reset</button>
+            <button id="fsSaveBtn" class="fs-control-btn save">💾 Zapisz</button>
+        </div>
+        
+        <button id="fsExitBtn" class="fs-exit-btn">✕</button>
+        
+        <!-- Lap Selection Modal -->
+        <div id="fsLapsModal" class="fs-laps-modal">
+            <div class="fs-laps-content">
+                <h3>Wybierz międzyczas do zapisu:</h3>
+                <div id="fsLapsModalList" class="fs-laps-list"></div>
+                <button id="fsLapsCancelBtn" class="fs-laps-cancel">Anuluj</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Panel -->
+    <div id="historyPanel" class="history-panel" style="display: none;">
+        <h3>Historia wyników</h3>
+        <div id="eventList" class="event-list"></div>
+        <div id="eventDetails" class="event-details"></div>
+    </div>
+
+    <!-- Checkpoint List Container -->
+    <div id="checkpointListContainer" class="checkpoint-container" style="display: none;">
+        <h3>Punkty kontrolne</h3>
+        <div id="storageUsage" class="storage-info">Sprawdzanie...</div>
+        <div id="checkpointList" class="checkpoint-list"></div>
+    </div>
+
+    <!-- AI Assistant Panel -->
+    <div id="geminiModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🤖 Asystent AI</h3>
+                <button id="geminiCloseBtn" class="close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <button id="generateAnnounceBtn" class="ai-btn">📢 Generuj komunikat speakera</button>
+                <div id="geminiResult" class="ai-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Theme Selector -->
+    <div class="theme-selector">
+        <label for="themeSelector">🎨</label>
+        <select id="themeSelector">
+            <option value="light">Jasny</option>
+            <option value="dark">Ciemny</option>
+            <option value="contrast">Kontrast</option>
+        </select>
+    </div>
+
+    <script type="module" src="js/diagnostics.js" type="module"></script>\n    <script type="module" src="js/main.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').catch(console.error);
+        }
+    </script>
+</body>
+</html>

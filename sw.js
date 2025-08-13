@@ -1,0 +1,95 @@
+// Plik: sw.js (Service Worker)
+// Naprawiona wersja z poprawną obsługą Response
+
+const CACHE_NAME = 'strongman-nextgen-cache-v4';
+const RUNTIME_CACHE = 'strongman-runtime-cache-v1';
+const MAX_RUNTIME_ENTRIES = 120;
+const urlsToCache = [
+    '/',
+    '/index.html',
+    '/css/main.css',
+    '/js/main.js',
+    '/js/api.js',
+    '/js/competition.js',
+    '/js/db.js',
+    '/js/eventsDb.js',
+    '/js/focusMode.js',
+    '/js/handlers.js',
+    '/js/history.js',
+    '/js/initialData.js',
+    '/js/persistence.js',
+    '/js/state.js',
+    '/js/stopwatch.js',
+    '/js/checkpointsDb.js',
+    '/js/ui.js'
+];
+
+// Ogranicz liczbę elementów w cache (usuwaj najstarsze)
+async function limitCacheEntries(cacheName, maxItems) {
+  try {
+    const cache = await caches.open(cacheName);
+    const keys = await cache.keys();
+    if (keys.length > maxItems) {
+      const deleteCount = keys.length - maxItems;
+      for (let i = 0; i < deleteCount; i++) {
+        await cache.delete(keys[i]);
+      }
+    }
+  } catch (e) {
+    console.error('limitCacheEntries error', e);
+  }
+}
+
+
+// Instalacja Service Workera
+self.addEventListener('install', (event) => {
+    console.log('Service Worker: Instalowanie nowej wersji...');
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then((cache) => {
+                console.log('Otwarto cache:', CACHE_NAME);
+                return cache.addAll(urlsToCache);
+            })
+    );
+    self.skipWaiting();
+});
+
+// Aktywacja Service Workera
+self.addEventListener('activate', (event) => {
+    console.log('Service Worker: Aktywacja nowej wersji...');
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    if (cacheName !== CACHE_NAME) {
+                        console.log('Service Worker: Usuwanie starego cache\'u:', cacheName);
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        })
+    );
+    return self.clients.claim();
+});
+
+// NAPRAWIONY fetch handler - zawsze zwraca Response
+self.addEventListener('fetch', (event) => {
+    event.respondWith(
+        fetch(event.request)
+            .catch(() => {
+                // Jeśli sieć zawiedzie, spróbuj pobrać z cache'u
+                return caches.match(event.request)
+                    .then(response => {
+                        // Jeśli znajdzie w cache, zwróć response
+                        if (response) {
+                            return response;
+                        }
+                        // Jeśli nie ma w cache, zwróć fallback Response
+                        return new Response('Resource not available offline', {
+                            status: 503,
+                            statusText: 'Service Unavailable'
+                        });
+                    });
+            })
+    );
+});

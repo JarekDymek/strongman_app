@@ -1,0 +1,406 @@
+// Plik: js/persistence.js
+// Cel: Zarządza utrwalaniem stanu i eksportami - NAPRAWIONA WERSJA
+
+import { getState, restoreState, resetState, state, getLogo, getEventHistory } from './state.js';
+import { showNotification, showConfirmation, DOMElements, renderFinalSummary } from './ui.js';
+import { clearHistory, saveToUndoHistory } from './history.js';
+import * as CheckpointsDB from './checkpointsDb.js';
+import * as Competition from './competition.js';
+import { saveCurrentState } from './database.js';
+
+
+const AUTO_SAVE_KEY = 'strongmanState_autoSave_v12';
+const THEME_KEY = 'strongmanTheme_v12';
+
+let autoSaveTimer;
+
+// === THEME MANAGEMENT ===
+export function saveTheme(themeName) { 
+    localStorage.setItem(THEME_KEY, themeName); 
+}
+
+export function loadTheme() { 
+    return localStorage.getItem(THEME_KEY) || 'light'; 
+}
+
+// === AUTO-SAVE (NAPRAWIONE) ===
+export function triggerAutoSave() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => {
+        // POPRAWKA: Usunięto sprawdzanie nieistniejącego mainContent
+        // W nowym systemie aplikacja może działać w różnych widokach
+        try {
+            localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(getState()));
+            const indicator = document.getElementById('saveIndicator');
+            if (indicator) {
+                indicator.classList.add('visible');
+                setTimeout(() => indicator.classList.remove('visible'), 1500);
+            }
+        } catch(e) {
+            showNotification("Błąd auto-zapisu. Pamięć może być pełna.", "error");
+        }
+    }, 1000);
+}
+
+// === SESSION RESTORATION ===
+export async function loadStateFromAutoSave() {
+    const savedStateJSON = localStorage.getItem(AUTO_SAVE_KEY);
+    if (!savedStateJSON) return false;
+
+    if (await showConfirmation("Wykryto niezakończoną sesję. Czy chcesz ją przywrócić?")) {
+        try {
+            const loadedState = JSON.parse(savedStateJSON);
+            restoreState(loadedState);
+            showNotification("Sesja została przywrócona!", "success");
+            return true;
+        } catch (error) {
+            showNotification("Plik auto-zapisu uszkodzony. Zostanie usunięty.", "error");
+            localStorage.removeItem(AUTO_SAVE_KEY);
+            return false;
+        }
+    } else {
+        localStorage.removeItem(AUTO_SAVE_KEY);
+        return false;
+    }
+}
+
+// === STATE EXPORT ===
+export function exportStateToFile(isInitial = false) {
+    const stateData = getState();
+    const stateJson = JSON.stringify(stateData, null, 2);
+    const blob = new Blob([stateJson], { type: 'application/json' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    
+    // POPRAWKA: Bezpieczne pobieranie wartości pól z fallbackami
+    const eventNameInput = document.getElementById('eventNameInput');
+    const eventLocationInput = document.getElementById('eventLocationInput');
+    
+    const eventName = (eventNameInput ? eventNameInput.value : stateData.eventName || 'zawody')
+        .replace(/[\s\/]/g, '_');
+    const location = (eventLocationInput ? eventLocationInput.value : stateData.eventLocation || 'lokalizacja')
+        .replace(/[\s\/]/g, '_');
+    const date = new Date().toISOString().slice(0, 10);
+    
+    let filename = `${location}_${eventName}_${date}`;
+    if (isInitial) {
+        filename += '_stan_poczatkowy.json';
+    } else {
+        filename += `_konkurencja_${state.eventNumber}.json`;
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    showNotification("Stan aplikacji został wyeksportowany.", "success");
+}
+
+// === STATE IMPORT ===
+export async function importStateFromFile(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (!importedData.competitors || !importedData.eventHistory) {
+                    throw new Error("Plik nie wygląda na prawidłowy plik stanu aplikacji.");
+                }
+                if (await showConfirmation("Czy na pewno chcesz importować stan z pliku? Spowoduje to nadpisanie bieżącej sesji.")) {
+                    restoreState(importedData);
+                    clearHistory();
+                    saveToUndoHistory(importedData);
+                    showNotification("Stan pomyślnie zaimportowano!", "success");
+                    resolve(true);
+                } else {
+                    resolve(false);
+                }
+            } catch (error) {
+                showNotification(`Błąd: ${error.message}`, "error");
+                resolve(false);
+            }
+        };
+        reader.readAsText(file);
+    });
+}
+
+// === APPLICATION RESET ===
+export async function resetApplication() {
+    if (await showConfirmation("Czy na pewno chcesz zresetować całą aplikację? Spowoduje to usunięcie wszystkich danych, w tym punktów kontrolnych z bazy danych.")) {
+        localStorage.removeItem(AUTO_SAVE_KEY);
+        localStorage.removeItem(THEME_KEY);
+        await CheckpointsDB.clearAllCheckpointsDB();
+        resetState();
+        showNotification("Aplikacja została zresetowana.", "success");
+        window.location.reload();
+    }
+}
+
+// === CHECKPOINT MANAGEMENT ===
+function getMinimalStateForCheckpoint() {
+    const fullState = getState();
+    return {
+        competitors: fullState.competitors,
+        scores: fullState.scores,
+        eventNumber: fullState.eventNumber,
+        eventHistory: fullState.eventHistory,
+        logoData: fullState.logoData,
+        currentEventType: fullState.currentEventType,
+        eventName: fullState.eventName,
+        eventLocation: fullState.eventLocation,
+        eventDate: fullState.eventDate,
+        eventTitle: fullState.eventTitle,
+        currentTab: fullState.currentTab
+    };
+}
+
+export async function saveCheckpoint() {
+    const checkpointName = `Punkt z ${new Date().toLocaleString('pl-PL')}`;
+    if (await showConfirmation(`Czy na pewno zapisać punkt kontrolny "${checkpointName}"?`)) {
+        const key = `checkpoint_${Date.now()}`;
+        const data = {
+            name: checkpointName,
+            timestamp: new Date().toISOString(),
+            state: getMinimalStateForCheckpoint()
+        };
+        try {
+            await CheckpointsDB.saveCheckpointDB(key, data);
+            showNotification(`Zapisano punkt kontrolny: "${checkpointName}"`, "success");
+            // POPRAWKA: Odśwież listę po zapisaniu
+            handleShowCheckpoints(true);
+            return true;
+        } catch (e) {
+            showNotification("Wystąpił błąd podczas zapisu punktu kontrolnego.", "error");
+            console.error("Błąd zapisu checkpointu do IndexedDB:", e);
+            return false;
+        }
+    }
+    return false;
+}
+
+export async function handleShowCheckpoints(forceShow = false) {
+    const container = DOMElements.checkpointList;
+    const listContainer = DOMElements.checkpointListContainer;
+    
+    if (!container || !listContainer) {
+        showNotification("Błąd: nie można znaleźć kontenera punktów kontrolnych.", "error");
+        return;
+    }
+    
+    try {
+        const checkpoints = await CheckpointsDB.getCheckpointsDB();
+
+        // Aktualizuj informację o użyciu pamięci
+        if (DOMElements.storageUsage) {
+            DOMElements.storageUsage.textContent = `Zapisano: ${checkpoints.length} punktów`;
+        }
+
+        // Renderuj listę checkpointów
+        if (checkpoints.length === 0) {
+            container.innerHTML = `
+                <div style="text-align:center; padding: 20px 0; color: #666;">
+                    <p>Brak zapisanych punktów kontrolnych.</p>
+                    <button id="closeCheckpointsBtn" class="btn btn-secondary" style="margin-top: 15px;">✕ Zamknij</button>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div class="history-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #ddd;">
+                    <h4 style="margin: 0;">Zapisane punkty kontrolne</h4>
+                    <button id="closeCheckpointsBtn" class="close-btn" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #666;">✕</button>
+                </div>
+                ${checkpoints.map(cp => `
+                    <div class="checkpoint-item" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+                        <div class="checkpoint-info" style="flex: 1;">
+                            <button data-action="load-checkpoint" data-key="${cp.key}" class="checkpoint-load-btn" style="background: none; border: none; cursor: pointer; text-align: left; width: 100%; padding: 8px; font-weight: bold; color: #333; border-radius: 4px; transition: background 0.2s;">
+                                <strong>${cp.name}</strong>
+                                <br><small style="color: #666;">${new Date(cp.timestamp || cp.key.replace('checkpoint_', '')).toLocaleString('pl-PL')}</small>
+                            </button>
+                        </div>
+                        <button class="delete-checkpoint-btn" data-action="delete-checkpoint" data-key="${cp.key}" title="Usuń punkt kontrolny" style="background: #e74c3c; color: white; border: none; padding: 8px 12px; border-radius: 3px; cursor: pointer; margin-left: 10px; transition: background 0.2s;">
+                            🗑️
+                        </button>
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        // POPRAWKA: Dodaj event listener dla przycisku zamknij
+        const closeBtn = container.querySelector('#closeCheckpointsBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                listContainer.style.display = 'none';
+            });
+        }
+        
+        if (forceShow) {
+            listContainer.style.display = 'block';
+        } else {
+            const isVisible = listContainer.style.display === 'block';
+            listContainer.style.display = isVisible ? 'none' : 'block';
+        }
+    } catch (error) {
+        console.error('Błąd ładowania checkpointów:', error);
+        showNotification("Błąd podczas ładowania punktów kontrolnych.", "error");
+    }
+}
+
+// POPRAWKA: Ulepszona obsługa akcji checkpointów
+export async function handleCheckpointListActions(e, refreshFullUICallback) {
+    const button = e.target.closest('button');
+    if (!button) return;
+
+    const action = button.dataset.action;
+    const key = button.dataset.key;
+
+    if (action === 'load-checkpoint') {
+        try {
+            const checkpoints = await CheckpointsDB.getCheckpointsDB();
+            const checkpointToLoad = checkpoints.find(cp => cp.key === key);
+            
+            if (checkpointToLoad && await showConfirmation(`Czy na pewno chcesz wczytać punkt kontrolny "${checkpointToLoad.name}"? Obecny stan zostanie utracony.`)) {
+                restoreState(checkpointToLoad.state);
+                clearHistory();
+                saveToUndoHistory(checkpointToLoad.state);
+                
+                // Zamknij panel checkpointów
+                const listContainer = DOMElements.checkpointListContainer;
+                if (listContainer) {
+                    listContainer.style.display = 'none';
+                }
+                
+                // Odśwież UI
+                if (refreshFullUICallback) {
+                    refreshFullUICallback();
+                }
+                
+                showNotification("Punkt kontrolny został wczytany.", "success");
+            }
+        } catch (error) {
+            console.error('Błąd ładowania checkpointu:', error);
+            showNotification("Błąd podczas ładowania punktu kontrolnego.", "error");
+        }
+    } else if (action === 'delete-checkpoint') {
+        if (await showConfirmation(`Czy na pewno chcesz trwale usunąć ten punkt kontrolny?`)) {
+            try {
+                await CheckpointsDB.deleteCheckpointDB(key);
+                showNotification("Punkt kontrolny usunięty.", "success");
+                handleShowCheckpoints(true); // Odśwież listę
+            } catch (error) {
+                console.error('Błąd usuwania checkpointu:', error);
+                showNotification("Błąd podczas usuwania punktu kontrolnego.", "error");
+            }
+        }
+    }
+}
+
+// POPRAWKA: Funkcja przeliczania po edycji wyników
+export async function recalculateAfterEdit(eventId, newResults) {
+    try {
+        const currentState = getState();
+        const eventToEdit = currentState.eventHistory.find(e => e.nr === eventId);
+        
+        if (!eventToEdit) {
+            throw new Error("Nie można znaleźć konkurencji do edycji");
+        }
+        
+        // Przygotuj dane do przeliczenia
+        const resultsForCalculation = newResults.map(result => ({
+            name: result.name,
+            result: result.result
+        }));
+        
+        // Przelicz punkty używając istniejącej funkcji
+        const totalCompetitors = currentState.competitors.length;
+        const { results, error } = Competition.calculateEventPoints(
+            resultsForCalculation, 
+            totalCompetitors, 
+            eventToEdit.type
+        );
+        
+        if (error) {
+            throw new Error("Błąd podczas przeliczania punktów");
+        }
+        
+        // Zaktualizuj wyniki w historii
+        eventToEdit.results = results;
+        
+        // Przelicz sumy punktów dla wszystkich zawodników
+        const newScores = {};
+        currentState.competitors.forEach(competitor => {
+            newScores[competitor] = 0;
+        });
+        
+        currentState.eventHistory.forEach(event => {
+            event.results.forEach(result => {
+                if (newScores.hasOwnProperty(result.name)) {
+                    newScores[result.name] += parseFloat(result.points) || 0;
+                }
+            });
+        });
+        
+        // Zaktualizuj stan
+        currentState.scores = newScores;
+        restoreState(currentState);
+        saveToUndoHistory(currentState);
+        
+        return true;
+    } catch (error) {
+        console.error("Błąd przeliczania po edycji:", error);
+        showNotification(`Błąd przeliczania: ${error.message}`, "error");
+        return false;
+    }
+}
+
+// === EKSPORT DO PDF (PLACEHOLDER) ===
+export async function exportToPdf() {
+    showNotification("Funkcja eksportu do PDF będzie dostępna w przyszłej wersji.", "info");
+    // Placeholder dla przyszłej implementacji eksportu do PDF
+}
+
+
+
+// ===============================
+// Public API: saveNow
+// Wymusza natychmiastowy zapis stanu aplikacji (flush autosave).
+// Zwraca Promise, który rozwiązuje się gdy zapis do IndexedDB zostanie rozpoczęty.
+// Jeśli persistence ma wewnętrzną funkcję do zapisu, wykorzystamy ją.
+
+// ===============================
+// Public API: saveNow
+// Wymusza natychmiastowy zapis stanu aplikacji (flush autosave). Zwraca Promise<boolean>.
+export async function saveNow() {
+  try {
+    const curState = (typeof getState === 'function') ? getState() : (typeof state !== 'undefined' ? state : null);
+
+    // Prefer saving to IndexedDB via database.saveCurrentState if available
+    if (typeof saveCurrentState === 'function' && curState) {
+      try {
+        await saveCurrentState(curState);
+        // also update localStorage quick copy for faster restore if needed
+        try { localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(curState)); } catch(e){}
+        return true;
+      } catch(e) {
+        console.warn('persistence.saveNow: saveCurrentState failed', e);
+      }
+    }
+
+    // Fallback: save to localStorage (best-effort)
+    if (curState) {
+      try {
+        localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(curState));
+        return true;
+      } catch(e) {
+        console.warn('persistence.saveNow: localStorage write failed', e);
+      }
+    }
+
+    // If nothing to save or all attempts failed, return false
+    return false;
+  } catch (e) {
+    console.error('persistence.saveNow unexpected error', e);
+    return false;
+  }
+}
+
