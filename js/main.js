@@ -1,7 +1,5 @@
 // Plik: js/main.js
 // Cel: Główny plik aplikacji z systemem zakładek - BEZ problematycznego import { pruneStoreIfNeeded, STORES } from './database.js';
-importu
-
 import * as UI from './ui.js';
 import * as State from './state.js';
 import * as History from './history.js';
